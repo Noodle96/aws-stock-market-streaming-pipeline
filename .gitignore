@@ -1,0 +1,20 @@
+# Python virtual environment
+venv/
+venv_stock_market_real_time/
+.env/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# AWS credentials
+.aws/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+temporal.md
