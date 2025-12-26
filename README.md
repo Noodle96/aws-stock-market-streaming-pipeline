@@ -70,7 +70,7 @@ Para este proyecto, el stream se configura en **modo on-demand**, lo que elimina
 
 Una vez creada la configuración, el stream queda disponible para comenzar a recibir eventos desde el productor local.
 
-![arquitectura](docs/screenshots/data_stream_stock_market.png)
+![dataStream](docs/screenshots/data_stream_stock_market.png)
 
 ---
 
@@ -112,16 +112,16 @@ Descomprimimos e instalamos:
 unzip awscliv2.zip
 sudo ./aws/install
 ```
-![arquitectura](docs/screenshots/aws_version.png)
+![awsVersion](docs/screenshots/aws_version.png)
 
 Creamos un usuario, configuramos los permisos y descargamos el Access key ID y el  Secret access key para hacer:
 
-![arquitectura](docs/screenshots/user.png)
+![user](docs/screenshots/user.png)
 
 ```bash
 aws configure
 ```
-![arquitectura](docs/screenshots/aws_configure.png)
+![awsConfigure](docs/screenshots/aws_configure.png)
 
 
 
@@ -157,18 +157,18 @@ Finalmente, se ejecuta el script productor desde la terminal para comenzar el en
 Durante la ejecución, el script imprime en consola:
 - El contenido del evento enviado.
 
-![arquitectura](docs/screenshots/json.png)
+![json](docs/screenshots/json.png)
 
 - La respuesta de Kinesis, incluyendo el `ShardId`, el `SequenceNumber` y el código HTTP 200, indicando un envío exitoso.
 
-![arquitectura](docs/screenshots/respuesta_kinesis.png)
+![answerKinesis](docs/screenshots/respuesta_kinesis.png)
 
 
 Para verificar que los datos están llegando correctamente a AWS, se utiliza la consola de Amazon Kinesis, revisando:
 - Las métricas de **Incoming Records** en la sección *Monitoring*.
 - Opcionalmente, el **Data Viewer** para inspeccionar los registros almacenados en los shards.
 
-![arquitectura](docs/screenshots/data_viewer.png)
+![dataViewer](docs/screenshots/data_viewer.png)
 
 
 Es importante detener manualmente la ejecución del script utilizando `CTRL + C` cuando no se requiera continuar enviando datos, ya que mantener el productor activo de forma indefinida nos puede generar costos innecesarios.
@@ -177,6 +177,15 @@ Es importante detener manualmente la ejecución del script utilizando `CTRL + C`
 ---
 
 Con esta etapa se completa la ingesta de datos en tiempo casi real, dejando el pipeline preparado para que servicios posteriores, como AWS Lambda, consuman los eventos del stream y continúen con el procesamiento y almacenamiento de la información.
+
+---
+
+
+
+
+
+
+
 
 
 
