@@ -1,0 +1,1 @@
+SELECT * FROM stock_data_table LIMIT 10;

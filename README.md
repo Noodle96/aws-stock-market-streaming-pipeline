@@ -391,3 +391,160 @@ Para validar el pipeline:
 4. En caso de errores, se revisaron logs en CloudWatch desde la pestaña Monitor de Lambda.
 
 ![prueba6](docs/screenshots/2.3_pruebas_lambda.png)
+
+---
+
+
+## 3.3 Consultar datos históricos de acciones con Amazon Athena
+
+Pasos a seguir:
+
+- Create a **Glue Catalog** Table for **Athena**.
+- Create an **S3 Bucket** to store Query Results.
+- Query Data Using **Athena**.
+
+### 3.3.1 Create a Glue Catalog Table for Athena
+
+Now that raw stock data is stored in Amazon S3, we will use Amazon Athena to query and analyze it efficiently.
+
+**Why Use Amazon Athena?**
+
+- **Serverless SQL Queries**: Query S3 data without setting up a database.
+- **Cost-Effective**: Pay only for the data scanned.
+- **Scalable**: Handles large datasets with ease.
+- **Amazon Athena** requires a Glue Data Catalog to define the schema of S3 data.
+
+**1. Open AWS Glue Console**
+- Navigate to **AWS Console** -> Open **AWS Glue**.
+
+![glue1](docs/screenshots/2.4_glue.png)
+
+- Click **Data Catalog** → **Databases**.
+
+![glue2](docs/screenshots/2.4_glue_database.png)
+
+- Click Add Database.
+- Database Name: `stock_data_db`
+- Click Create.
+
+![glue3](docs/screenshots/2.4_glue_database_create.png)
+
+**2. Create a Table in Glue for Stock Data**
+
+- Open **AWS Glue** Console -> Click **Tables** -> Add Table.
+
+![glue4](docs/screenshots/2.4_glue_add_table.png)
+
+- Table Name: `stock_data_table`.
+- Database: Select `stock_data_db`.
+
+![glue5](docs/screenshots/2.4_glue_add_table_name.png)
+
+- Table Type: Choose **S3 Data**.
+- S3 Path: Enter the path where **stock data** is stored, e.g.,
+
+![glue6](docs/screenshots/2.4_glue_data_store.png)
+
+- Select JSON as the data format. Click Next.
+
+![glue7](docs/screenshots/2.4_glue_data_format.png)
+
+- Click Next.
+
+**3. Define Table Schema**
+
+- Add the following columns:
+
+![glue8](docs/screenshots/2.4_glue_scheme.png)
+
+![glue9](docs/screenshots/2.4_glue_addCampos1.png)
+
+![glue10](docs/screenshots/2.4_glue_addCampos8.png)
+
+- Click Next -> Review -> **Create Table**.
+
+### 3.3.2 Create an S3 Bucket to store Query Results
+
+We need a S3 bucket for storing Athena query results, to create one:
+
+- Go to AWS S3 Console -> Click "**Create Bucket**."
+- Name it something like: `athena-query-results-<a-unique-id>`
+
+![glue11](docs/screenshots/2.4_s3_query_rrsults.png)
+
+- Leave the rest as defaults.
+- Click "**Create Bucket**."
+
+### 3.3.3 Query Data Using Athena
+
+- Open AWS Console -> Navigate to Amazon Athena.
+
+![athena1](docs/screenshots/2.4_athena.png)
+
+- Click- Launch Query Editor. 
+
+![athena2](docs/screenshots/2.4_athena_launch_editor.png)
+
+- Select stock_data_db as the database.
+
+![athena3](docs/screenshots/2.4_athena_config.png)
+
+- You will get a pop-up like one given below asking to setup the query location in Amazon S3. Click on Edit Settings.
+
+![athena4](docs/screenshots/2.4_athena_sets3.png)
+
+- Click Save.
+- Run this SQL query to test:
+```bash
+SELECT * FROM stock_data_table LIMIT 10;
+```
+![athena5](docs/screenshots/2.4_athena_q1.png)
+
+You are able a query your data through Athena! You can try retrieving data through multiple SQL queries. Lets try to run some Advanced queries.
+
+**1. Find Top 5 Stocks with the Highest Price Change**
+
+```bash
+SELECT symbol, price, previous_close,
+       (price - previous_close) AS price_change
+FROM stock_data_table
+ORDER BY price_change DESC
+LIMIT 5;
+```
+![athena6](docs/screenshots/2.4_athena_q2.png)
+
+**2. Get Average Trading Volume Per Stock**
+
+```bash
+SELECT symbol, AVG(volume) AS avg_volume
+FROM stock_data_table
+GROUP BY symbol;
+```
+
+![athena7](docs/screenshots/2.4_athena_q3.png)
+
+**3. Find Anomalous Stocks (Price Change > 5%)**
+```bash
+SELECT symbol, price, previous_close,
+       ROUND(((price - previous_close) / previous_close) * 100, 2) AS change_percent
+FROM stock_data_table
+WHERE ABS(((price - previous_close) / previous_close) * 100) > 5;
+```
+
+![athena8](docs/screenshots/2.4_athena_q4.png)
+
+Basically, no Anomalous Stocks from the data source!
+
+Asi mismo podemos ver que todos los resultados han sido guardados en **S3** al que le asociamos.
+
+![athena8](docs/screenshots/2.4_s3_result_1.png)
+
+Por ejemplo para la consulta 1, el .csv respetivo contiene:
+
+![athena8](docs/screenshots/2.4_s3_result_2.png)
+
+
+
+---
+
+## 3.4 Stock trend Alerts using SNS
