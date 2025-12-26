@@ -180,13 +180,214 @@ Con esta etapa se completa la ingesta de datos en tiempo casi real, dejando el p
 
 ---
 
+## 3.2 Procesamiento de Datos con AWS Lambda (Kinesis → DynamoDB + S3)
+
+En esta etapa se implementa el procesamiento automático de los eventos que llegan a **Amazon Kinesis Data Streams**. En lugar de almacenar directamente los datos tal como llegan, se utiliza **AWS Lambda** como componente serverless para transformar la información, calcular métricas útiles y separar el almacenamiento según el propósito:
+
+- **Amazon S3**: conserva los datos **crudos** (raw) como respaldo e historial.
+- **Amazon DynamoDB**: almacena datos **procesados y estructurados** para consultas de baja latencia.
+
+El resultado es un flujo desacoplado y escalable: el productor envía eventos al stream, y Lambda los consume en lotes (batch=2) para persistirlos y enriquecerlos sin necesidad de administrar servidores.
+
+Pasos a seguir:
+
+- Crear una tabla de **DynamoDB** para almacenar los datos procesados.
+- Crear **S3** para almacenar los datos sin procesar.
+- Configurar **AWS Lambda** en la consola de AWS.
+- Probar la integración.
+
+---
+
+### 3.2.1 Crear tabla DynamoDB para datos procesados
+
+En este paso, procesaremos los datos entrantes usando **AWS Lambda** y almacenaremos registros estructurados en **Amazon DynamoDB** para realizar consultas en tiempo real.
+
+**¿Por qué necesitamos una tabla de DynamoDB?**
+
+Una base de datos NoSQL como DynamoDB es ideal para gestionar datos bursátiles en tiempo real gracias a sus siguientes características:
+
+- Rápidas operaciones de lectura y escritura: garantizan consultas de baja latencia.
+- Esquema flexible: permite ajustar fácilmente los campos de datos bursátiles.
+- Escalabilidad: gestiona transacciones bursátiles de gran volumen de forma eficiente.
+
+En lugar de almacenar los precios brutos de las acciones, **AWS Lambda** procesará los datos antes de guardarlos en DynamoDB, este enfoque nos permite:
+
+- Estructurar los datos para una rápida recuperación.
+- Calcular métricas bursátiles como cambios de precio y medias móviles.
+- Detectar anomalías en los movimientos bursátiles.
+
+**¿Qué se almacenará en DynamoDB?**
+
+La función Lambda procesará los siguientes campos clave de datos bursátiles antes de almacenarlos en DynamoDB:
+
+![dynamoDBTable](docs/screenshots/table.png)
+
+Crearemos la tabla **DynamoDB**  en **AWS Console**:
+- Open the **AWS Console** -> Navigate to **DynamoDB**.
+
+![dynamoDB](docs/screenshots/2.3_dynamoDB.png)
+
+- Click Create Table.
+- **Table name:** `stock-market-data`
+- **Partition key:** `symbol` (String)
+- **Sort key:** `timestamp` (String)
+
+![featureTable](docs/screenshots/2.3_table_stock_market.png)
+
+- Keep the rest of the configurations as default.
+- Click Create Table.
+
+![tableCreated](docs/screenshots/2.3_table_created.png)
+
+---
+
+### 3.2.2 Crear bucket S3 para almacenar datos crudos
+
+Se creó un bucket en Amazon S3 para archivar los eventos en formato JSON antes de su procesamiento final. Este almacenamiento es útil para:
+- auditoría y trazabilidad (mantener “raw truth”)
+- análisis histórico posterior (Athena)
+- potencial re-procesamiento o batch processing
+- Procesamiento por lotes, útil para entrenar modelos de aprendizaje automático sobre tendencias bursátiles.
+
+Crearemos un **S3** bucket:
+- Open AWS Console -> Navigate to S3.
+
+![s3](docs/screenshots/2.3_s3.png)
+
+- Click Create bucket.
+- Bucket Name: Enter a unique name, e.g., `stock-market-data-bucket-1996`.
+- Region: Choose the same region as your Lambda function.
+- Keep default settings (Block Public Access enabled).
+- Click Create bucket.
+
+![s3Created](docs/screenshots/2.3_s3_created.png)
+
+Los objetos se guardan con una estructura jerárquica por símbolo y timestamp:
+- `raw-data/<symbol>/<timestamp>.json`
+
+---
+
+### 3.2.3 Crear rol IAM para AWS Lambda
+
+Antes de crear la función, se configuró un rol IAM para otorgar permisos de lectura/escritura a los servicios involucrados. Para replicar el laboratorio se adjuntaron políticas administradas:
+- Open AWS Console -> Navigate to IAM.
+
+![iam1](docs/screenshots/2.3_iam.png)
+
+- Click Roles -> Create Role.
+- Trusted Entity Type: Select AWS Service.
+- Use Case: Choose Lambda -> Click Next.
+
+![iam1](docs/screenshots/2.3_iam_step1.png)
+
+- Attach Policies: Add the following managed policies:
+    - `AmazonKinesisFullAccess` (Read from Kinesis).
+    - `AmazonDynamoDBFullAccess` (Write to DynamoDB).
+    - `AmazonS3FullAccess` (Write to S3).
+    - `AWSLambdaBasicExecutionRole` (logs en CloudWatch)
+
+![iam3](docs/screenshots/2.3_iam_step2.1.png)
+
+- Click Next -> Name the role `Lambda_Kinesis_DynamoDB_Role` -> Create Role.
+
+![iam2](docs/screenshots/2.3_iam_step2.png)
+
+- Finalmente, veremos que nuestro rol se ha creado.
+
+![iam4](docs/screenshots/2.3_iam_rol_creado.png)
+
+---
+
+### 3.2.4 Configurar AWS Lambda (trigger Kinesis + código)
+
+**¿Por qué necesitamos Lambda para el procesamiento?**
+
+En lugar de simplemente almacenar precios de acciones sin procesar, usamos AWS Lambda para:
+
+- Estructurar los datos -> Almacenar los datos procesados ​​en DynamoDB para una rápida recuperación.
+- Calcular métricas de acciones -> Realizar un seguimiento de las variaciones de precios, los movimientos porcentuales y las medias móviles.
+- Detectar anomalías -> Identificar acciones con subidas o bajadas repentinas.
+- Datos sin procesar -> Almacenar los datos sin procesar en un bucket de S3.
+
+Creamos una nueva función Lambda:
+
+- Open AWS Console -> Navigate to Lambda.
+
+![lambda1](docs/screenshots/2.3_lambda.png)
+
+- Click Create Function -> Select Author from Scratch.
+- **Function name:** `ProcessStockData`
+- **Runtime:** Python 3.13
+- Execution Role:  Select Use an existing role.
+- Choose `Lambda_Kinesis_DynamoDB_Role` (created in the previous step).
+
+![lambda2](docs/screenshots/2.3_lambda_config.png)
+
+- Click Create Function.
+
+Agregamos **Kinesis** como un Trigger
+- In the Function Overview tab -> Click Add Trigger.
+
+![lambda3](docs/screenshots/2.3_lambda_addKinesisAsTrigger.png)
+
+- Select Kinesis as the source -> Choose the `stock-market-stream`.
+
+![lambda4](docs/screenshots/2.3_triggerConfig.png)
+
+- Add a **Batch size** of 2 (la función se activa cuando se acumulan 2 registros).
+
+![lambda5](docs/screenshots/2.3_triggerConfig2.png)
+
+- Click Add.
 
 
+**Comprender el tamaño del lote:**
+
+- El tamaño del lote en Kinesis determina cuántos registros deben recopilarse antes de activar la función Lambda.
+- Dado que enviamos registros cada 30 segundos a Kinesis, Lambda esperará a que se activen 2 registros (1 minuto).
+- Por ejemplo: si la generación de registros se realiza cada 2 segundos, aumente el tamaño del lote a 10-50.
+
+**Deploy the Lambda Code:**
+- Copy the Lambda function:
+[`firstLambdaFunction.py`](lambda_functions/firstLambdaFunction.py)
+- Paste it into the AWS Lambda Code Editor.
+
+![lambda5](docs/screenshots/2.3_code.png)
+
+- Click Deploy.
 
 
+Finalmente, se desplegó el código para:
+1. Decodificar el payload de Kinesis (base64 → JSON).
+2. Guardar el evento crudo en S3.
+3. Calcular métricas (`change`, `change_percent`, `moving_average`).
+4. Marcar anomalías si la variación absoluta supera 5%.
+5. Insertar el registro procesado en DynamoDB.
+
+---
+
+### 3.2.5 Prueba de integración y validación
+
+Para validar el pipeline:
+- Se ejecutó el productor local (`stream_stock_data.py`) para generar eventos hacia Kinesis.
+
+![prueba1](docs/screenshots/2.3_productor_local.png)
+
+2. Se verificó la aparición de ítems en DynamoDB (Explore table items).
+
+![prueba2](docs/screenshots/2.3_prueba_dynamo.png)
+
+3. Se verificó la creación de archivos JSON en S3 dentro de `raw-data/`.
+
+![prueba3](docs/screenshots/2.3_s3_1.png)
+
+![prueba4](docs/screenshots/2.3_s3_2.png)
+
+![prueba5](docs/screenshots/2.3_s3_3.png)
+
+![prueba6](docs/screenshots/2.3_s3_4.png)
 
 
+4. En caso de errores, se revisaron logs en CloudWatch desde la pestaña Monitor de Lambda.
 
-
-
-
+![prueba6](docs/screenshots/2.3_pruebas_lambda.png)
