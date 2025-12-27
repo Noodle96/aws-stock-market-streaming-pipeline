@@ -543,8 +543,200 @@ Por ejemplo para la consulta 1, el .csv respetivo contiene:
 
 ![athena8](docs/screenshots/2.4_s3_result_2.png)
 
-
-
 ---
 
 ## 3.4 Stock trend Alerts using SNS
+
+STEPS TO BE PERFORMED:
+
+- Enable DynamoDB Streams.
+- Create an SNS Topic.
+- Create an IAM Role for Lambda.
+- Create Lambda for Trend Analysis.
+
+### 3.4.1 Enable DynamoDB Streams
+
+Now we will set up real-time stock trend alerts using AWS services. For this, we need to:
+
+- Enable DynamoDB Streams to capture real-time stock price changes.
+- Use Amazon SNS to send notifications based on detected trends.
+- Deploy an AWS Lambda function to analyze trends and trigger alerts.
+
+DynamoDB Streams allow us to capture data changes in real time, which Lambda will analyze for trend detection
+
+Entonces,
+
+- Open **AWS DynamoDB Console** -> Select your table (`stock-market-data`).
+- Click **Exports and Streams** -> Enable DynamoDB Streams.
+
+![sns1](docs/screenshots/2.5_DynamoDBStream.png)
+
+- Select **New image** (captures the latest version of the records).
+
+![sns2](docs/screenshots/2.5_DynamoDBStream2.png)
+
+- Click Turn on stream y nos quedaría asi:
+
+![sns3](docs/screenshots/2.5_DynamoDBStream3.png)
+
+### 3.4.2 Create an SNS Topic
+
+**Amazon SNS** (Simple Notification Service) allows us to send trend alerts via email, SMS, or other endpoints.
+
+- Go to **AWS SNS** Console -> Create Topic.
+
+![sns5](docs/screenshots/2.5_sns.png)
+
+- Choose Type: Standard
+- Topic name: `Stock_Trend_Alerts`
+
+![sns4](docs/screenshots/2.5_sns_createTopic.png)
+
+- Leave the rest as defaults. Click Create Topic.
+- Add Subscribers:
+    - Click Create Subscription.
+
+    ![sns6](docs/screenshots/2.5_sns_createSubs.png)
+
+    - Select Protocol: Email/SMS.
+    - Enter the recipient email address or phone number.
+    - Click on Create Subscription.
+
+    ![sns7](docs/screenshots/2.5_sns_createSubs2.png)
+
+    - Confirm the subscription via the received email/SMS.
+
+    ![sns8](docs/screenshots/2.5_sns_conf1.png)
+
+    ![sns8](docs/screenshots/2.5_sns_conf2.png)
+
+---
+
+### 3.4.3 Create an IAM Role for Lambda
+
+Before creating the Lambda function, we need to set up an IAM role with appropriate permissions:
+
+- Go to **AWS IAM Console** -> Click Roles -> Click Create Role.
+- Select Trusted Entity: `AWS Service, and choose Lambda`.
+
+![sns9](docs/screenshots/2.5_iam_role1.png)
+
+- Attach Policies:
+    - `AmazonDynamoDBFullAccess` → Allows Lambda to read stock data.
+    - `AmazonSNSFullAccess` → Allows Lambda to publish alerts to SNS.
+    - `AWSLambdaBasicExecutionRole` → Allows CloudWatch Logs.
+
+    ![sns11](docs/screenshots/2.5_permisos.png)
+
+- Click Next, name the role `StockTrendLambdaRole`, and create the role.
+
+![sns10](docs/screenshots/2.5_iam_role.png)
+
+- finalmente quedando asi:
+
+![sns12](docs/screenshots/2.5_iam_role_final.png)
+
+---
+
+### 3.4.4 Create Lambda for Trend Analysis
+
+- Go to **AWS Lambda** Console -> Create Function.
+- Choose "**Author from Scratch**".|
+- Function Name: `StockTrendAnalysis`
+- Runtime: Python 3.13.
+
+![sns13](docs/screenshots/2.5_lambda_info_2.png)
+
+- Permissions: Choose "**Use an existing role**" and select `StockTrendLambdaRole`
+
+![sns14](docs/screenshots/2.5_lambda_info_2_1.png)
+
+- Click Create Function.
+- In the function overview, Click on Add Trigger.
+
+![sns15](docs/screenshots/2.5_l2_addtrigger.png)
+
+- Select DynamoDB as the source.
+- Choose the created DynamoDB table (`stock-market-data`).
+- Modify the Batch size to 2.
+
+![sns16](docs/screenshots/2.5_l2_addtrigger2.png)
+
+- Add the Lambda Code.
+
+[`secondLambdaFunction.py`](lambdaFunctions/secondLambdaFunction.py)
+
+**How is the Trend Calculated?**
+
+- The Lambda function performs real-time trend analysis using Simple Moving Averages (SMA):
+
+    - SMA-5 (Short-Term Moving Average) – Average stock price over the last 5 records.
+    - SMA-20 (Long-Term Moving Average) – Average stock price over the last 20 records.
+    - Uptrend Signal: If SMA-5 crosses above SMA-20, a BUY alert is sent.
+    - Downtrend Signal: If SMA-5 crosses below SMA-20, a SELL alert is sent.
+
+**Understanding the Lambda Code for Trend Analysis**
+
+- Here’s a breakdown of how it works:
+
+    - **Fetching Recent Stock Data:** The function retrieves stock prices from the last 5 minutes using get_recent_stock_data().
+    It queries DynamoDB for stock records and sorts them by timestamp.
+
+    - **Calculating Moving Averages:** The function computes SMA-5 (short-term) and SMA-20 (long-term) averages using calculate_moving_average().
+    It also calculates the previous values of these SMAs to compare trends over time.
+
+    - **Detecting Trend Reversals:** If SMA-5 crosses above SMA-20, it signals an uptrend (BUY opportunity).
+    If SMA-5 crosses below SMA-20, it signals a downtrend (SELL opportunity).
+
+    - **Sending Alerts via Amazon SNS:** If a trend shift is detected, a notification is published to an SNS topic, alerting users about potential buying or selling opportunities.
+    The function handles possible SNS failures using a try-except block.
+
+- Finalmente, Click on Deploy.
+
+---
+
+**Congratulations!** We have successfully completed the project- `Stock Market Real-Time Data Analytics Pipeline on AWS`.
+
+
+## 3.5 Conclusion & Clean-up
+
+**Conclusion**
+
+This project successfully demonstrates how to build a near real-time stock market data analytics pipeline using AWS’s fully managed, serverless services. By integrating Amazon Kinesis, AWS Lambda, Amazon DynamoDB, Amazon S3, Amazon Athena, and Amazon SNS, we've created a robust and scalable architecture capable of streaming, processing, storing, analyzing, and alerting on stock data with minimal operational overhead.
+
+**Key outcomes include:**
+
+- **Real-time data ingestion and processing** with event-driven architecture.
+- **Anomaly detection and trend alerts** using AWS Lambda and SNS.
+- **Separation of raw and processed data** for efficient storage and analytics.
+- **Low-cost implementation** suitable for learning and prototyping.
+
+This hands-on lab provides practical experience with cloud-native data pipelines and offers a strong foundation for building more advanced real-time analytics systems in production environments.
+
+**Clean-up**
+- **Delete Kinesis Data Stream**:
+    - Navigate to the AWS Kinesis Console -> Data Streams. Select the stock market data stream and click Delete.
+
+- **Delete Lambda Functions:**
+    - Open the AWS Lambda Console. Select the functions (`ProcessStockData, StockTrendAnalysis`). Click Delete and confirm the action.
+
+- **Delete DynamoDB Table:**
+    - Go to the DynamoDB Console. Select the `stock-market-data` table. Click Delete Table and confirm.
+
+- **Delete SNS Topic and Subscriptions:**
+    - Open the AWS SNS Console → Topics. Select the `Stock_Trend_Alerts` topic. Click Delete to remove the topic and its subscriptions.
+
+- **Delete S3 Buckets:**
+    - Navigate to the S3 Console. Select the bucket storing stock data and Athena query results. Empty the bucket first, then delete it.
+
+- **Delete Athena Tables and Queries:**
+    - Open the AWS Athena Console. Delete any tables and queries created for stock data.
+
+- **Delete IAM Roles and Policies:**
+    - Remove any IAM roles or policies specific to this project.
+
+***NOTE***
+
+- This project implements a near real-time data analytics pipeline rather than a fully real-time system. The stock data is streamed, processed by AWS Lambda, and stored in DynamoDB with a 30-second delay.
+
+- The primary goal of this guide is to provide a hands-on learning experience on creating a Data Analytics pipeline while keeping AWS costs low.
