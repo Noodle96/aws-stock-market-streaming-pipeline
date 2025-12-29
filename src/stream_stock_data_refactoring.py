@@ -44,7 +44,7 @@ class AppConfig:
     region_name: str = "us-east-1"
     stream_name: str = "stock-market-stream"
     stock_symbol: str = "AAPL"
-    delay_seconds: int = 30  # cada cuánto enviamos un evento
+    delay_seconds: int = 10  # cada cuánto enviamos un evento
 
 
 # ==============================
@@ -224,7 +224,7 @@ def main() -> None:
         region_name="us-east-1",
         stream_name="stock-market-stream",
         stock_symbol="AAPL",
-        delay_seconds=30,
+        delay_seconds=3,
     )
     send_to_kinesis_loop(config)
 

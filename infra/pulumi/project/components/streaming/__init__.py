@@ -1,0 +1,1 @@
+# components/streaming/__init__.py

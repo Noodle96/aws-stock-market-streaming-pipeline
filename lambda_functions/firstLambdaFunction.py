@@ -8,8 +8,8 @@ dynamodb = boto3.resource("dynamodb")
 s3 = boto3.client("s3")
 
 # Resource Names
-DYNAMO_TABLE = "stock-market-data"
-S3_BUCKET = "stock-market-data-bucket-1996"
+DYNAMO_TABLE = "stock-market-data" # esto puede variar
+S3_BUCKET = "stock-market-data-bucket-1996" # esto puede variar
 # stock-market-data-bucket-1996
 
 # Table reference

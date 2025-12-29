@@ -1,0 +1,11 @@
+name: stock-market-iac
+description: Infrastructure as Code for Stock Market Real-Time Data Analytics Pipeline on AWS
+runtime:
+  name: python
+  options:
+    toolchain: pip
+    virtualenv: venv
+config:
+  pulumi:tags:
+    value:
+      pulumi:template: aws-python
