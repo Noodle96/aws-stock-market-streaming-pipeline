@@ -104,7 +104,7 @@ def lambda_handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         change_percent: Decimal = compute_change_percent(price, prev_close)
 
         # Simple anomaly rule (same spirit as before)
-        threshold: Decimal = Decimal("0.2050")
+        threshold: Decimal = Decimal("0.1050")
         print("\t[LAMBDA HANDLER] In lambda handler: threshold =", threshold)
         print("\t[LAMBDA HANDLER] In lambda handler: change_percent =", change_percent)
         if abs(change_percent) > threshold:
